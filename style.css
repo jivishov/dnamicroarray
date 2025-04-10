@@ -10,174 +10,163 @@ h1, h2, h3, h4 {
     color: #333;
 }
 
-/* --- UPDATED Lab Bench Layout --- */
 #lab-bench {
-    display: flex; /* Use flex row for the main columns */
-    gap: 15px; /* Spacing between columns */
+    display: flex;
+    gap: 15px;
     background-color: #e0e0e0;
     padding: 15px;
     border-radius: 8px;
     border: 1px solid #ccc;
-    /* Control height and prevent page scrolling */
-    max-height: 88vh; /* Adjust as needed */
-    height: 88vh; /* Force height */
-    overflow: hidden; /* Hide overflow from bench */
-    align-items: stretch; /* Make columns stretch vertically */
+    max-height: 88vh;
+    height: 88vh;
+    overflow: hidden;
+    align-items: stretch;
 }
 
-
- /* Column 1: Instructions */
 #instructions-column {
-    flex: 0 0 20%; /* Don't grow, don't shrink, base width 20% */
+    flex: 0 0 20%;
     display: flex;
     flex-direction: column;
-    overflow-y: auto; /* Scroll this column if needed */
-    min-width: 220px; /* Minimum width */
+    overflow-y: auto;
+    min-width: 220px;
 }
 #instructions {
     background-color: #fff;
     padding: 15px;
     border-radius: 5px;
     border: 1px solid #ddd;
-    /* Removed margin-bottom as spacing is handled by column gap */
 }
 
- 
-/* Column 2: Tools & Reagents */
 #tools-reagents-column {
-    flex: 0 0 20%; /* Don't grow, don't shrink, base width 20% */
+    flex: 0 0 20%;
     display: flex;
-    flex-direction: column; /* Stack tools above reagents */
-    overflow-y: auto; /* Scroll this column if needed */
-    min-width: 220px; /* Minimum width */
-    gap: 15px; /* Space between tools and reagents */
+    flex-direction: column;
+    overflow-y: auto;
+    min-width: 220px;
+    gap: 15px;
 }
 #tools, #reagents {
     background-color: #f9f9f9;
     padding: 10px;
     border-radius: 5px;
     border: 1px solid #ddd;
-    /* Removed margin-bottom */
-    /* Removed margin-top: auto */
 }
 
-/* Column 3: Right Panel */
 #right-panel {
-    flex: 1; /* Grow to take remaining space */
+    flex: 1;
     display: flex;
     flex-direction: column;
-    overflow-y: auto; /* Scroll this column if needed */
-    min-width: 400px; /* Minimum width */
-    gap: 15px; /* Space between microarray and quickstrip */
+    overflow-y: auto;
+    min-width: 400px;
+    gap: 15px;
 }
 #microarray-station, #quickstrip-station {
     background-color: #fff;
     padding: 15px;
     border-radius: 5px;
     border: 1px solid #ddd;
-    /* Removed margin-bottom */
 }
 
-
-#instruction-text {
-    font-weight: bold;
-    color: #0056b3;
-    min-height: 40px; /* Prevent layout shifts */
-}
-
+#instruction-text { font-weight: bold; color: #0056b3; min-height: 40px; }
 #progress-checklist ul { list-style: none; padding: 0;}
 #progress-checklist li { margin-bottom: 5px; opacity: 0.5;}
 #progress-checklist li.completed { opacity: 1; font-weight: bold; color: green; text-decoration: line-through;}
 
- 
-.tool-button, .reagent-button, #start-button {
-    display: block;
-    width: calc(100% - 20px); /* Adjust width */
+#start-button { /* Keep styles for start button */
+    display: block; width: calc(100% - 20px); padding: 10px; margin: 5px auto;
+    font-size: 1em; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; background-color: #e7e7e7;
+}
+#start-button:hover { background-color: #ddd;}
+#start-button:disabled { cursor: not-allowed; opacity: 0.6; background-color: #f0f0f0;}
+
+/* --- SVG Icon Styles --- */
+.svg-tool-container { /* Container for pipette SVG */
+    text-align: center; /* Center pipette */
+    margin-bottom: 15px;
+    min-height: 130px; /* Ensure space for pipette */
+}
+
+.tool-grid { /* Container for the 4 tool icons */
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* 2x2 grid */
+    gap: 15px;
+    justify-items: center; /* Center SVGs horizontally in grid cells */
+    align-items: center; /* Center SVGs vertically */
     padding: 10px;
-    margin: 5px auto; /* Center buttons */
-    font-size: 1em;
+}
+
+.reagent-grid {
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-start; /* Align to top including text labels */
+    padding: 10px 0;
+}
+
+.tool-svg, .reagent-tube {
     cursor: pointer;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background-color: #e7e7e7;
+    transition: transform 0.2s ease-in-out, opacity 0.3s ease;
+    display: block; /* Ensure SVG takes block space */
+    margin: auto; /* Help centering in grid/flex */
 }
 
-.tool-button:hover, .reagent-button:hover, #start-button:hover { background-color: #ddd;}
-.tool-button:disabled, .reagent-button:disabled, #start-button:disabled { cursor: not-allowed; opacity: 0.6; background-color: #f0f0f0;}
+.tool-svg:hover, .reagent-tube:hover {
+    transform: scale(1.05);
+}
+
+/* Style for disabled SVGs */
+.tool-svg.disabled, .reagent-tube.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none; /* Disable clicks directly on SVG */
+}
+
+/* Ensure text label doesn't block clicks on SVG */
+.tool-svg text, .reagent-tube text {
+    pointer-events: none;
+    user-select: none; /* Prevent text selection */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+/* Pipette SVG specific (if needed) */
+#pipette-svg {
+    /* Add any specific styles, like margin */
+}
+
+/* --- REMOVE Old Pipette Styles --- */
+/* #pipette-area { display: none; } */
+/* #pipette { display: none; } */
+/* #pipette-tip { display: none; } */
+/* #pipette-liquid { display: none; } */
+
+/* --- REMOVE Old Tool Button Style --- */
+/* .tool-button { display: none; } */
 
 
-#pipette-area { margin-bottom: 10px; padding: 10px; border: 1px dashed #ccc; text-align: center; min-height: 60px;}
-#pipette { display: inline-block; position: relative; background-color: lightblue; padding: 10px 15px; border-radius: 5px; border: 1px solid #999;}
-#pipette-tip { position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 15px solid #eee;}
-#pipette-tip.empty { border-top-color: transparent;}
-#pipette-liquid { position: absolute; bottom: -13px; left: 50%; transform: translateX(-50%); width: 6px; height: 10px; border-radius: 0 0 3px 3px; opacity: 0.8;}
-#pipette-liquid.empty { background-color: transparent;}
-#pipette-liquid.eb { background-color: skyblue;}
-#pipette-liquid.cdna { background-color: lightgreen;}
-#pipette-liquid.hb { background-color: violet;}
-#pipette-liquid.mix { background-color: orange;}
- 
-
+/* --- Microarray/Quickstrip Styles --- */
 .card-labels {
-    display: grid;
-    grid-template-columns: repeat(9, 1fr); /* 9 equal columns for the labels */
-    gap: 8px; /* Match the gap of the microarray-card */
-    /* REMOVE padding-left and padding-right */
-    margin-bottom: 5px;
-    font-size: 0.8em;
-    font-weight: bold;
-    text-align: center;
-    /* Add padding to match the container below, if needed */
-    padding: 0 8px; /* Apply padding symmetrically if card below has it */
+    display: grid; grid-template-columns: repeat(9, 1fr); gap: 8px;
+    margin-bottom: 5px; font-size: 0.8em; font-weight: bold; text-align: center;
+    padding: 0 8px;
 }
-
-/* --- ADD THIS RULE --- */
-/* Target the second span (index 1) which is the first actual label */
-.card-labels span:nth-child(2) {
-    grid-column-start: 1; /* Force this label into the first column */
-}
-/* --- END ADDED RULE --- */
- 
-
-/* Ensure the microarray card itself has matching properties */
+.card-labels span:nth-child(2) { grid-column-start: 1; }
 #microarray-card {
-    display: grid;
-    grid-template-columns: repeat(9, 1fr); /* 9 columns */
-    gap: 8px; /* Match label gap */
-    /* padding: 8px; Keep padding for the spots */
-    padding-top: 8px; /* Only add padding to the top */
-    padding-bottom: 8px; /* Only add padding to the bottom */
-    /*padding-right: 8px;  Only add padding to the right */
-    padding-left: 30px; /* Add padding to the left */
-    border: 1px solid #ccc;
-    background-color: #f0f0f0;
+    display: grid; grid-template-columns: repeat(9, 1fr); gap: 8px;
+    padding-top: 8px; padding-bottom: 8px; padding-left: 8px; /* Adjusted padding */
+    border: 1px solid #ccc; background-color: #f0f0f0;
 }
-
 #quickstrip-plate {
-    display: grid;
-    grid-template-columns: repeat(9, 1fr);
-    gap: 8px;
-    padding: 8px;
-    border: 1px solid #ccc;
-    background-color: #f0f0f0;
-    /* --- Added Shadow --- */
-    box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.2); /* offset-x | offset-y | blur-radius | color */
+    display: grid; grid-template-columns: repeat(9, 1fr); gap: 8px; padding: 8px;
+    border: 1px solid #ccc; background-color: #f0f0f0;
+    box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.2);
   }
 
-  
-/* Add row labels using pseudo-elements or dedicated divs if preferred */
-#microarray-card::before, #quickstrip-plate::before {
-     /* This is tricky with pure grid, might need extra divs or different layout */
-}
-
-
-.spot { width: 30px; height: 30px; border-radius: 50%; background-color: #d3d3d3; border: 1px solid #aaa; cursor: pointer; position: relative; display: flex; justify-content: center; align-items: center; font-size: 0.7em; color: rgba(0,0,0,0.5); transition: background-color 0.3s ease;} /* Adjusted size/font */
+.spot { width: 30px; height: 30px; border-radius: 50%; background-color: #d3d3d3; border: 1px solid #aaa; cursor: pointer; position: relative; display: flex; justify-content: center; align-items: center; font-size: 0.7em; color: rgba(0,0,0,0.5); transition: background-color 0.3s ease;}
 .spot.clickable:hover { border-color: #007bff; box-shadow: 0 0 5px #007bff;}
-.spot.processing {
-    animation: pulse 1s infinite;
-}
 
-/* Spot status/color classes (unchanged from previous fix) */
+/* Spot status/color classes */
+.spot.initial { background-color: #d3d3d3; }
 .spot.eb-applied { background-color: skyblue; }
 .spot.sample-applied-temp { background-color: orange; }
 .spot.hb-applied { background-color: violet; }
@@ -188,8 +177,7 @@ h1, h2, h3, h4 {
 .spot.yellow { background-color: yellow; color: black;}
 .spot.black { background-color: black; color: white;}
 
-
-.well { width: 30px; height: 30px; border: 1px solid #999; background-color: #e8e8e8; cursor: pointer; position: relative; display: flex; justify-content: center; align-items: center; font-size: 0.8em; color: #555;} /* Adjusted size/font */
+.well { width: 30px; height: 30px; border: 1px solid #999; background-color: #e8e8e8; cursor: pointer; position: relative; display: flex; justify-content: center; align-items: center; font-size: 0.8em; color: #555;}
 .well.foil { background-image: linear-gradient(45deg, #c0c0c0, #f0f0f0, #c0c0c0); border-color: #777;}
 .well.punched { background-image: none; background-color: #f5f5dc;}
 .well.cdna-added { background-color: #add8e6;}
@@ -198,22 +186,13 @@ h1, h2, h3, h4 {
 
 @keyframes mixPulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
-
+/* --- Analysis Section Styles --- */
 #analysis-section { margin-top: 20px; padding: 15px; background-color: #fff; border: 1px solid #ddd; border-radius: 5px;}
 #analysis-section.hidden { display: none;}
 #results-table { width: 100%; border-collapse: collapse; margin-top: 10px;}
-#results-table th, #results-table td { border: 1px solid #ccc; padding: 6px; text-align: center;} /* Adjusted padding */
+#results-table th, #results-table td { border: 1px solid #ccc; padding: 6px; text-align: center;}
 #results-table th { background-color: #f2f2f2;}
-#results-table input { width: 35px; text-align: center;} /* Adjusted width */
+#results-table input { width: 35px; text-align: center;}
 #results-feedback { margin-top: 10px; font-weight: bold;}
-/* Style for analysis buttons container */
-.analysis-buttons {
-    margin-top: 15px; /* Add some space above buttons */
-}
-
-/* Adjust button styles if needed */
-#check-results-button, #erase-table-button {
-    padding: 8px 15px;
-    font-size: 0.9em;
-    cursor: pointer;
-}
+.analysis-buttons { margin-top: 15px; }
+#check-results-button, #erase-table-button { padding: 8px 15px; font-size: 0.9em; cursor: pointer;}
