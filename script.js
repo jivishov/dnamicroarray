@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- DOM Elements ---
     const instructionText = document.getElementById('instruction-text');
     const startButton = document.getElementById('start-button');
-    const skipButton = document.getElementById('skip-button');
+    const skipButton = document.getElementById('skip-button'); // Keep reference even if commented out in HTML
     const checklistItems = {
         orient: document.getElementById('step-orient'),
         eb: document.getElementById('step-eb'),
@@ -19,8 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Tool SVGs
-    const pipetteSvg = document.getElementById('pipette-svg'); // The whole pipette
-    const pipetteTipMount = document.getElementById('pipette-tip-mount'); // The <g> where tip is added
+    const pipetteSvg = document.getElementById('pipette-svg');
+    const pipetteTipMount = document.getElementById('pipette-tip-mount');
     const tipBoxSvg = document.getElementById('tip-box-svg');
     const wasteBinSvg = document.getElementById('waste-bin-svg');
     const incubatorSvg = document.getElementById('incubator-svg');
@@ -34,6 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Lab Areas
     const microarrayCardDiv = document.getElementById('microarray-card');
     const quickstripPlateDiv = document.getElementById('quickstrip-plate');
+
+    // Analysis
     const analysisSection = document.getElementById('analysis-section');
     const resultsTableBody = document.querySelector('#results-table tbody');
     const checkResultsButton = document.getElementById('check-results-button');
@@ -42,7 +44,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- State Variables ---
     let currentStep = 'initial';
-    // pipetteState now includes references to the SVG elements for tip/liquid
     let pipetteState = {
         hasTip: false,
         loaded: null, // 'EB', 'cDNA', 'HB', 'MIX', or null
@@ -56,173 +57,247 @@ document.addEventListener('DOMContentLoaded', () => {
     let requiredClicks = 0;
     let mixSpotCounter = 0;
     const totalSamples = 36;
+    const liquidColors = { 'EB': 'skyblue', 'cDNA': 'lightgreen', 'HB': 'violet', 'MIX': 'orange' };
+    const expectedSpotColors = { 'E': ['yellow', 'red', 'green', 'black', 'red', 'yellow', 'green', 'black', 'red'], 'F': ['yellow', 'red', 'green', 'black', 'red', 'yellow', 'green', 'black', 'red'], 'G': ['yellow', 'red', 'green', 'black', 'red', 'yellow', 'green', 'black', 'yellow'], 'H': ['yellow', 'red', 'green', 'black', 'red', 'yellow', 'yellow', 'black', 'red'] };
 
-     // --- Color Mapping ---
-     const liquidColors = {
-        'EB': 'skyblue',
-        'cDNA': 'lightgreen',
-        'HB': 'violet',
-        'MIX': 'orange'
-     };
 
-    // --- Expected Results ---
-    const expectedSpotColors = { /* ... remains the same ... */
-        'E': ['yellow', 'red', 'green', 'black', 'red', 'yellow', 'green', 'black', 'red'],
-        'F': ['yellow', 'red', 'green', 'black', 'red', 'yellow', 'green', 'black', 'red'],
-        'G': ['yellow', 'red', 'green', 'black', 'red', 'yellow', 'green', 'black', 'yellow'],
-        'H': ['yellow', 'red', 'green', 'black', 'red', 'yellow', 'yellow', 'black', 'red']
-    };
+    // *** DEFINE ALL FUNCTIONS FIRST ***
 
-    // --- Initialization ---
+    // --- Initialization Function ---
     function init() {
-        createGrid('spot', microarrayCardDiv, 4, 9, ['E', 'F', 'G', 'H']);
-        createGrid('well', quickstripPlateDiv, 4, 9, ['E', 'F', 'G', 'H']);
-        setupEventListeners();
-        updateInstruction('Welcome! Click "Start Experiment" to begin.');
-        disableAllControls();
-        startButton.disabled = false;
-        if (skipButton) {
-             skipButton.addEventListener('click', skipToAnalysis);
-       }
+        console.log("Initializing simulation..."); // DEBUG
+        try {
+            // Ensure critical elements are checked before proceeding
+            const criticalElements = { instructionText, startButton, /*skipButton,*/ pipetteSvg, pipetteTipMount, tipBoxSvg, wasteBinSvg, incubatorSvg, uvLightSvg, ebTube, cdnaTube, hbTube, microarrayCardDiv, quickstripPlateDiv, analysisSection, resultsTableBody, checkResultsButton, eraseTableButton, resultsFeedback };
+            for (const [name, element] of Object.entries(criticalElements)) {
+                if (!element && name !== 'skipButton') { // Allow skip button to be optional
+                    throw new Error(`Initialization Error: Could not find element "${name}". Check HTML ID.`);
+                }
+            }
+            // Populate checklistItems after main elements are verified
+            Object.keys(checklistItems).forEach(key => {
+                checklistItems[key] = document.getElementById(`step-${key}`);
+                if (!checklistItems[key]) console.warn(`Checklist item 'step-${key}' not found.`);
+            });
+
+            createGrid('spot', microarrayCardDiv, 4, 9, ['E', 'F', 'G', 'H']);
+            createGrid('well', quickstripPlateDiv, 4, 9, ['E', 'F', 'G', 'H']);
+            setupEventListeners(); // Setup listeners AFTER grids are created and functions are defined
+            updateInstruction('Welcome! Click "Start Experiment" to begin.');
+            disableAllControls();
+            if(startButton) startButton.disabled = false;
+            console.log("Initialization complete."); // DEBUG
+        } catch (error) {
+            console.error("Error during init:", error);
+            alert(`An error occurred during initialization: ${error.message}. Check the console.`);
+        }
     }
 
-    function createGrid(type, container, rows, cols, rowLabels) { /* ... remains the same ... */
+     // --- Grid Creation ---
+     function createGrid(type, container, rows, cols, rowLabels) {
+        if (!container) {
+            console.error(`Cannot create grid: container for ${type} not found.`);
+            return;
+        }
         container.innerHTML = '';
         const stateObject = (type === 'spot') ? spotsState : wellsState;
+        const expectedKeys = ['E', 'F', 'G', 'H']; // Check if expectedSpotColors has these keys
+
         for (let r = 0; r < rows; r++) {
+            const rowLabel = rowLabels[r];
+            if (type === 'spot' && !expectedSpotColors[rowLabel]) {
+                 console.error(`Missing expected color data for row: ${rowLabel}`);
+                 continue; // Skip row if data missing
+            }
             for (let c = 0; c < cols; c++) {
-                const id = `${rowLabels[r]}${c + 1}`;
+                const id = `${rowLabel}${c + 1}`;
                 const div = document.createElement('div');
                 div.id = `${type}-${id}`; div.classList.add(type);
-                div.dataset.row = rowLabels[r]; div.dataset.col = c + 1;
+                div.dataset.row = rowLabel; div.dataset.col = c + 1;
                 div.textContent = id;
-                 if (type === 'well') {
-                    div.classList.add('foil');
-                    stateObject[id] = { id: id, foil: true, cdna_added: false, mixed: false, mix_clicks: 0 };
-                 } else {
-                    const color = expectedSpotColors[rowLabels[r]][c];
-                     stateObject[id] = { id: id, eb_applied: false, sample_applied: false, hb_applied: false, final_color: color, needs_processing: true, current_visual: 'initial' };
-                    div.classList.add('initial'); div.classList.add('uv-off');
-                 }
-                container.appendChild(div);
+                try { // Add try-catch for safety
+                    if (type === 'well') {
+                        div.classList.add('foil');
+                        stateObject[id] = { id: id, foil: true, cdna_added: false, mixed: false, mix_clicks: 0 };
+                    } else { // spot
+                        if (!expectedSpotColors[rowLabel] || c >= expectedSpotColors[rowLabel].length) { // Check column index too
+                             console.error(`Missing expected color data for spot: ${id}`);
+                             continue; // Skip spot if data missing
+                        }
+                        const color = expectedSpotColors[rowLabel][c];
+                        stateObject[id] = { id: id, eb_applied: false, sample_applied: false, hb_applied: false, final_color: color, needs_processing: true, current_visual: 'initial' };
+                        div.classList.add('initial'); div.classList.add('uv-off');
+                    }
+                    container.appendChild(div);
+                } catch (e) {
+                    console.error(`Error creating element ${type}-${id}:`, e);
+                }
             }
         }
     }
 
-    function setupEventListeners() {
-        startButton.addEventListener('click', startExperiment);
-        // Attach listeners to SVGs
-        tipBoxSvg.addEventListener('click', handleTipBoxClick);
-        wasteBinSvg.addEventListener('click', handleWasteBinClick);
-        incubatorSvg.addEventListener('click', handleIncubatorClick);
-        uvLightSvg.addEventListener('click', handleUvLightToggle);
-        ebTube.addEventListener('click', () => handleReagentClick('EB'));
-        cdnaTube.addEventListener('click', () => handleReagentClick('cDNA'));
-        hbTube.addEventListener('click', () => handleReagentClick('HB'));
-        // Other listeners
-        microarrayCardDiv.addEventListener('click', (e) => { if (e.target.classList.contains('spot')) handleSpotClick(e.target.id); });
-        quickstripPlateDiv.addEventListener('click', (e) => { if (e.target.classList.contains('well')) handleWellClick(e.target.id); });
-        checkResultsButton.addEventListener('click', checkAnalysisResults);
-        eraseTableButton.addEventListener('click', eraseAnalysisTable);
+     // --- Event Listener Setup ---
+     function setupEventListeners() {
+         console.log("Setting up event listeners..."); // DEBUG
+        if (startButton) startButton.addEventListener('click', startExperiment); else console.error("Start button not found for listener.");
+        if (skipButton) skipButton.addEventListener('click', skipToAnalysis); // Keep listener if button exists
+
+        // Attach listeners to SVGs, checking existence
+        if (tipBoxSvg) tipBoxSvg.addEventListener('click', handleTipBoxClick); else console.error("tipBoxSvg not found for listener.");
+        if (wasteBinSvg) wasteBinSvg.addEventListener('click', handleWasteBinClick); else console.error("wasteBinSvg not found for listener.");
+        if (incubatorSvg) incubatorSvg.addEventListener('click', handleIncubatorClick); else console.error("incubatorSvg not found for listener.");
+        if (uvLightSvg) uvLightSvg.addEventListener('click', handleUvLightToggle); else console.error("uvLightSvg not found for listener.");
+        if (ebTube) ebTube.addEventListener('click', () => handleReagentClick('EB')); else console.error("ebTube not found for listener.");
+        if (cdnaTube) cdnaTube.addEventListener('click', () => handleReagentClick('cDNA')); else console.error("cdnaTube not found for listener.");
+        if (hbTube) hbTube.addEventListener('click', () => handleReagentClick('HB')); else console.error("hbTube not found for listener.");
+
+        // Other listeners, checking existence
+        if (microarrayCardDiv) microarrayCardDiv.addEventListener('click', (e) => { if (e.target.classList.contains('spot')) handleSpotClick(e.target.id); }); else console.error("microarrayCardDiv not found for listener.");
+        if (quickstripPlateDiv) quickstripPlateDiv.addEventListener('click', (e) => { if (e.target.classList.contains('well')) handleWellClick(e.target.id); }); else console.error("quickstripPlateDiv not found for listener.");
+        if (checkResultsButton) checkResultsButton.addEventListener('click', checkAnalysisResults); else console.error("checkResultsButton not found for listener.");
+        if (eraseTableButton) eraseTableButton.addEventListener('click', eraseAnalysisTable); else console.error("eraseTableButton not found for listener.");
+         console.log("Event listeners setup complete."); // DEBUG
     }
 
-    // --- Game Flow & Step Logic ---
-
-    function startExperiment() { /* ... remains the same ... */
-        startButton.style.display = 'none';
-        skipButton.style.display = 'none'; // Also hide skip button
-        currentStep = 'orient';
-        updateChecklist('orient');
-        advanceStep('get-tip-eb');
+     // --- Game Flow & Step Logic ---
+     function startExperiment() {
+        if(startButton) startButton.style.display = 'none';
+        if(skipButton) skipButton.style.display = 'none'; // Also hide skip button
+        // Don't set currentStep here, let advanceStep do it
+        updateChecklist('orient'); // Mark orientation done visually
+        advanceStep('get-tip-eb'); // Advance to the *first* interactive step
     }
 
-    function advanceStep(nextStep) { /* ... remains the same ... */
-        currentStep = nextStep;
-        updateUIForStep();
-    }
+     function advanceStep(nextStep) {
+         currentStep = nextStep;
+         // console.log("Advanced to step:", currentStep); // DEBUG
+         updateUIForStep();
+     }
 
-    function updateUIForStep() {
+     function updateUIForStep() {
+        // 1. Disable everything first
         disableAllControls();
-        let instruction = '';
-        // Always enable discard if tip is present
-        if (pipetteState.hasTip) {
-            enableSvgControls(['waste-bin-svg']);
-        }
+        let instruction = ''; // Initialize instruction text
 
+    // 2. *** MODIFIED: Enable discard CONDITIONALLY ***
+    // Enable discard ONLY if a tip is present AND we are NOT in a multi-step application phase
+    let allowDiscard = pipetteState.hasTip &&
+                       currentStep !== 'apply-eb' &&
+                       currentStep !== 'apply-hb' &&
+                       currentStep !== 'spot-sample' &&
+                       currentStep !== 'dispense-cdna' && // Disable while waiting to dispense
+                       currentStep !== 'mix-well'; // Disable during mixing
+
+    if (allowDiscard) {
+        enableSvgControls(['waste-bin-svg']);
+    }
+    // *** END MODIFICATION ***
+
+        // 3. Determine instruction and enable specific controls based on CURRENT step
         switch (currentStep) {
-             // EB Cycle
             case 'get-tip-eb':
                 instruction = 'Get a fresh pipette tip by clicking the Tip Box icon.';
+                enableSvgControls(['tip-box-svg']); // Enable ONLY the tip box
+                break;
+            case 'load-eb':
+                instruction = 'Load Equilibration Buffer (EB) by clicking the blue EB tube.';
+                enableSvgControls(['eb-tube-svg']); // Enable ONLY EB tube
+            // Allow discard here if user loaded wrong reagent? Maybe not, keep it disabled until dispense/application.
+            // Re-enable discard check from step 2:
+            if (pipetteState.hasTip) enableSvgControls(['waste-bin-svg']);
+            break;
+            case 'apply-eb':
+                instruction = `Apply 5µL EB to ${requiredClicks} remaining spots. Click each required spot.`;
+                setSpotsClickable(true, 'eb'); // Enable spots
+                break;
+            case 'dry-eb':
+                instruction = 'Incubate the card to dry the EB. Click the Incubator icon.';
+                enableSvgControls(['incubator-svg']);
+                // Allow discard here (pipette should be empty)
+                 if (pipetteState.hasTip) enableSvgControls(['waste-bin-svg']);
+                break;
+            case 'get-tip-mix':
+                instruction = `Prepare sample ${getWellIdFromCounter(mixSpotCounter)}. Click the Tip Box icon.`;
                 enableSvgControls(['tip-box-svg']);
                 break;
-             case 'load-eb':
-                 instruction = 'Load Equilibration Buffer (EB) by clicking the blue EB tube.';
-                 enableSvgControls(['eb-tube-svg']);
-                 break;
-            // ... (apply-eb enables spots) ...
-            case 'apply-eb': instruction = `Apply 5µL EB to ${requiredClicks} remaining spots. Click each required spot.`; setSpotsClickable(true, 'eb'); break;
-            case 'dry-eb':
-                 instruction = 'Incubate the card to dry the EB. Click the Incubator icon.';
-                 enableSvgControls(['incubator-svg']);
-                 break;
-            // Mix/Spot Cycle
-             case 'get-tip-mix':
-                 instruction = `Prepare sample ${getWellIdFromCounter(mixSpotCounter)}. Click the Tip Box icon.`;
-                 enableSvgControls(['tip-box-svg']);
-                 break;
-             case 'load-cdna':
-                 instruction = `Add 5µL Control cDNA to Well ${getWellIdFromCounter(mixSpotCounter)}. Click the green cDNA tube.`;
-                 enableSvgControls(['cdna-tube-svg']);
-                 break;
-            // ... (dispense, mix enable wells; spot enables spots) ...
-            case 'dispense-cdna': instruction = `Dispense Control cDNA into Well ${getWellIdFromCounter(mixSpotCounter)}. Click the correct well.`; setWellsClickable(true, 'dispense-cdna', getWellIdFromCounter(mixSpotCounter)); break;
-            case 'mix-well': const wellIdMix = getWellIdFromCounter(mixSpotCounter); instruction = `Mix sample in Well ${wellIdMix}. Click well 3 times (${wellsState[wellIdMix]?.mix_clicks || 0}/3).`; setWellsClickable(true, 'mix-well', wellIdMix); break;
-            case 'spot-sample': instruction = `Apply 5µL mixed sample to Spot ${getSpotIdFromCounter(mixSpotCounter)}. Click the correct spot.`; setSpotsClickable(true, 'spot-sample', getSpotIdFromCounter(mixSpotCounter)); break;
-             case 'dry-sample':
-                 instruction = 'All samples spotted. Incubate the card. Click the Incubator icon.';
-                 enableSvgControls(['incubator-svg']);
-                 break;
-            // HB Cycle
-             case 'get-tip-hb':
-                 instruction = 'Prepare to apply Hybridization Buffer (HB). Click the Tip Box icon.';
-                 enableSvgControls(['tip-box-svg']);
-                 break;
-             case 'load-hb':
-                 instruction = 'Load Hybridization Buffer (HB). Click the violet HB tube.';
-                 enableSvgControls(['hb-tube-svg']);
-                 break;
-            // ... (apply-hb enables spots) ...
-            case 'apply-hb': instruction = `Apply 5µL HB to ${requiredClicks} remaining spots. Click each required spot.`; setSpotsClickable(true, 'hb'); break;
+            case 'load-cdna':
+                instruction = `Add 5µL Control cDNA to Well ${getWellIdFromCounter(mixSpotCounter)}. Click the green cDNA tube.`;
+                enableSvgControls(['cdna-tube-svg']);
+                            // Allow discard here
+                if (pipetteState.hasTip) enableSvgControls(['waste-bin-svg']);
+                break;
+            case 'dispense-cdna':
+                instruction = `Dispense Control cDNA into Well ${getWellIdFromCounter(mixSpotCounter)}. Click the correct well.`;
+                setWellsClickable(true, 'dispense-cdna', getWellIdFromCounter(mixSpotCounter));
+                break;
+            case 'mix-well':
+                const wellIdMix = getWellIdFromCounter(mixSpotCounter);
+                instruction = `Mix sample in Well ${wellIdMix}. Click well 3 times (${wellsState[wellIdMix]?.mix_clicks || 0}/3).`;
+                setWellsClickable(true, 'mix-well', wellIdMix);
+                break;
+            case 'spot-sample':
+                instruction = `Apply 5µL mixed sample to Spot ${getSpotIdFromCounter(mixSpotCounter)}. Click the correct spot.`;
+                setSpotsClickable(true, 'spot-sample', getSpotIdFromCounter(mixSpotCounter));
+                break;
+            case 'dry-sample':
+                instruction = 'All samples spotted. Incubate the card. Click the Incubator icon.';
+                enableSvgControls(['incubator-svg']);
+                             // Allow discard here
+                if (pipetteState.hasTip) enableSvgControls(['waste-bin-svg']);
+                break;
+            case 'get-tip-hb':
+                instruction = 'Prepare to apply Hybridization Buffer (HB). Click the Tip Box icon.';
+                enableSvgControls(['tip-box-svg']);
+                break;
+            case 'load-hb':
+                instruction = 'Load Hybridization Buffer (HB). Click the violet HB tube.';
+                enableSvgControls(['hb-tube-svg']);
+                             // Allow discard here
+                if (pipetteState.hasTip) enableSvgControls(['waste-bin-svg']);
+                break;
+            case 'apply-hb':
+                instruction = `Apply 5µL HB to ${requiredClicks} remaining spots. Click each required spot.`;
+                setSpotsClickable(true, 'hb');
+                break;
             case 'dry-hb':
-                 instruction = 'Incubate the card a final time. Click the Incubator icon.';
-                 enableSvgControls(['incubator-svg']);
-                 break;
-            // Visualization & Analysis
-             case 'visualize':
-                 instruction = 'Experiment complete! Click the UV Light icon to view results. Then proceed to Analysis.';
+                instruction = 'Incubate the card a final time. Click the Incubator icon.';
+                enableSvgControls(['incubator-svg']);
+             // Allow discard here
+                if (pipetteState.hasTip) enableSvgControls(['waste-bin-svg']);                
+                break;
+            case 'visualize':
+                instruction = 'Experiment complete! Click the UV Light icon to view results. Then proceed to Analysis.';
+                enableSvgControls(['uv-light-svg']);
+                showAnalysisSection(); // Ensure analysis section is ready even if light isn't toggled yet
+             // Allow discard here (pipette should be empty)
+                if (pipetteState.hasTip) enableSvgControls(['waste-bin-svg']);                
+                break;
+             case 'analyze':
+                 instruction = 'Analyze results. Fill table based on colors. Click "Check My Results".';
                  enableSvgControls(['uv-light-svg']);
-                 showAnalysisSection();
+                 enableControls(['check-results-button', 'erase-table-button']); // Enable regular buttons
+                               // Allow discard here
+                if (pipetteState.hasTip) enableSvgControls(['waste-bin-svg']);
                  break;
-              case 'analyze':
-                  instruction = 'Analyze results. Fill table based on colors. Click "Check My Results".';
-                  // Enable UV Light SVG, Check, and Erase buttons
-                  enableSvgControls(['uv-light-svg']);
-                  enableControls(['check-results-button', 'erase-table-button']);
-                  break;
-             case 'done':
-                 instruction = 'Analysis complete! Simulation finished.';
-                 // Keep UV and Erase active
-                 enableSvgControls(['uv-light-svg']);
-                 enableControls(['erase-table-button']);
-                 break;
-             default: /* ... error handling ... */ instruction = `Error: Unknown step '${currentStep}'`; console.error(`Unknown step: ${currentStep}`); break;
+            case 'done':
+                instruction = 'Analysis complete! Simulation finished.';
+                enableSvgControls(['uv-light-svg']);
+                enableControls(['erase-table-button']);
+                             // Allow discard here
+             if (pipetteState.hasTip) enableSvgControls(['waste-bin-svg']);
+                break;
+            default:
+                instruction = `Error: Unknown step '${currentStep}'`;
+                console.error(`Unknown step in updateUIForStep: ${currentStep}`);
         }
+
+        // 4. Update the instruction text display *after* determining it
         updateInstruction(instruction);
     }
 
-    // --- Event Handlers ---
 
-    function handleTipBoxClick() {
+     // --- Event Handlers ---
+     function handleTipBoxClick() {
         if (pipetteState.hasTip) {
             updateInstruction('You already have a tip. Discard it first.');
             return;
@@ -238,7 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
         else updateUIForStep();
     }
 
-    function handleWasteBinClick() {
+     function handleWasteBinClick() {
         if (!pipetteState.hasTip) return;
         pipetteState.hasTip = false;
         pipetteState.loaded = null;
@@ -246,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateUIForStep();
     }
 
-    function handleReagentClick(reagent) { // Logic remains the same, relies on updatePipetteVisual
+     function handleReagentClick(reagent) {
          if (!pipetteState.hasTip) { updateInstruction('Need tip!'); return; }
          if (pipetteState.loaded) { updateInstruction('Pipette loaded, discard tip.'); return; }
          let expectedReagent = null;
@@ -263,8 +338,6 @@ document.addEventListener('DOMContentLoaded', () => {
          if (nextStep) advanceStep(nextStep);
          else console.error("Reagent click error:", reagent);
     }
-
-    // handleWellClick, handleSpotClick, handleIncubatorClick, handleUvLightToggle: Logic largely same, ensure they call updatePipetteVisual when pipette state changes.
 
      function handleWellClick(wellElementId) { // Calls updatePipetteVisual
          const wellId = wellElementId.split('-')[1];
@@ -298,7 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
          }
      }
 
-    function handleSpotClick(spotElementId) { // Calls updatePipetteVisual
+     function handleSpotClick(spotElementId) { // Calls updatePipetteVisual
         const spotId = spotElementId.split('-')[1];
         const spot = document.getElementById(spotElementId);
         const state = spotsState[spotId];
@@ -329,7 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function handleIncubatorClick() { /* ... remains the same ... */
+     function handleIncubatorClick() {
          if (incubatorBusy) return;
          if (currentStep !== 'dry-eb' && currentStep !== 'dry-sample' && currentStep !== 'dry-hb') { updateInstruction("Nothing to incubate."); return; }
          incubatorBusy = true; updateInstruction('Incubating...'); disableAllControls();
@@ -344,11 +417,10 @@ document.addEventListener('DOMContentLoaded', () => {
          }, incubationTime);
     }
 
-    function handleUvLightToggle() { /* ... remains the same ... */
+     function handleUvLightToggle() {
          if (currentStep !== 'visualize' && currentStep !== 'analyze' && currentStep !== 'done') { updateInstruction('Cannot use UV yet.'); return; } if (incubatorBusy) return;
          uvLightOn = !uvLightOn;
-         // Update SVG appearance instead of button text if desired (e.g., add glow effect)
-         uvLightSvg.style.filter = uvLightOn ? 'drop-shadow(0 0 5px #DA70D6)' : '';
+         uvLightSvg.style.filter = uvLightOn ? 'drop-shadow(0 0 5px #DA70D6)' : ''; // Add/remove glow
 
          for (const spotId in spotsState) {
              const spotElement = document.getElementById(`spot-${spotId}`); const state = spotsState[spotId];
@@ -361,10 +433,11 @@ document.addEventListener('DOMContentLoaded', () => {
          if (currentStep === 'visualize' && uvLightOn) { updateChecklist('visualize'); advanceStep('analyze'); }
     }
 
-     // --- Skip Function (if using) ---
-     function skipToAnalysis() { /* ... remains the same ... */
+     // --- Skip Function ---
+     function skipToAnalysis() {
         console.log("--- Skipping to Analysis ---");
-        uvLightOn = false; pipetteState = { hasTip: false, loaded: null, tipSvgElement: null, liquidSvgElement: null }; // Also clear SVG refs
+        uvLightOn = false; pipetteState = { hasTip: false, loaded: null, tipSvgElement: null, liquidSvgElement: null };
+        updatePipetteVisual(); // Clear pipette visual
         for (const spotId in spotsState) {
             spotsState[spotId].sample_applied=true; spotsState[spotId].eb_applied=true; spotsState[spotId].hb_applied=true;
             const spotElement = document.getElementById(`spot-${spotId}`);
@@ -373,23 +446,27 @@ document.addEventListener('DOMContentLoaded', () => {
         updateChecklist('orient'); updateChecklist('eb'); updateChecklist('dry1'); updateChecklist('mixSpot'); updateChecklist('dry2'); updateChecklist('hb'); updateChecklist('dry3');
         showAnalysisSection();
         advanceStep('visualize');
-        skipButton.style.display = 'none'; startButton.style.display = 'none';
+        if(skipButton) skipButton.style.display = 'none';
+        if(startButton) startButton.style.display = 'none';
         console.log("--- Ready for UV Toggle and Analysis ---");
     }
 
-    // --- Analysis Functions --- (showAnalysisSection, populateAnalysisTable, eraseAnalysisTable, checkAnalysisResults) ... remain the same ...
-     function showAnalysisSection() { analysisSection.classList.remove('hidden'); if (resultsTableBody) populateAnalysisTable(); else console.error("resultsTableBody not found!"); }
-     function populateAnalysisTable() { if (!resultsTableBody) { console.error("Cannot populate table, resultsTableBody null."); return; } resultsTableBody.innerHTML = ''; const rows=['E','F','G','H']; rows.forEach((rowLabel,index)=>{const tr=document.createElement('tr'); const patientNum=index+1; let pName=`Patient ${patientNum}`; if(patientNum===1)pName+=" (Joe)"; const tdP=document.createElement('td'); tdP.textContent=pName; tr.appendChild(tdP); for(let i=0;i<9;i++){const cN=i+1; const sId=`${rowLabel}${cN}`; const tdI=document.createElement('td'); const inp=document.createElement('input'); inp.type="text"; inp.id=`input-${sId}`; inp.dataset.row=rowLabel; inp.dataset.col=cN; inp.maxLength="1"; tdI.appendChild(inp); tr.appendChild(tdI);} resultsTableBody.appendChild(tr); }); }
-     function eraseAnalysisTable() { const inputs = resultsTableBody.querySelectorAll('input[type="text"]'); inputs.forEach(input => { input.value = ''; input.style.backgroundColor = ''; }); resultsFeedback.textContent = ''; checkResultsButton.disabled = false; console.log("Analysis table erased."); }
-     function checkAnalysisResults() { let correctCount=0; const totalInputs=36; resultsFeedback.textContent=''; let applicableSpots=0; for(const spotId in spotsState){const state=spotsState[spotId]; const inputEl=document.getElementById(`input-${spotId}`); if(inputEl){const userVal=inputEl.value.trim().toLowerCase(); let expectedSym='',isCorrect=false; if(state.sample_applied){applicableSpots++; switch(state.final_color){case 'red':expectedSym='↑';break; case 'green':expectedSym='↓';break; case 'yellow':expectedSym='n';break; case 'black':expectedSym='-';break;} if(state.final_color==='red'&&(userVal==='↑'||userVal==='u'))isCorrect=true; else if(state.final_color==='green'&&(userVal==='↓'||userVal==='d'))isCorrect=true; else if(state.final_color==='yellow'&&(userVal==='n'||userVal==='='))isCorrect=true; else if(state.final_color==='black'&&(userVal==='-'||userVal==='b'||userVal===''))isCorrect=true; if(isCorrect){correctCount++; inputEl.style.backgroundColor='lightgreen';}else{inputEl.style.backgroundColor='lightcoral';}}else{if(userVal===''||userVal==='-'){inputEl.style.backgroundColor='lightgrey';}else{inputEl.style.backgroundColor='lightcoral';}}}} resultsFeedback.textContent=`You got ${correctCount} out of ${applicableSpots} applicable results correct. ${correctCount===applicableSpots?'Excellent!':'Review colors.'}`; if(correctCount===applicableSpots&&applicableSpots>0){updateChecklist('analyze'); currentStep='done'; updateUIForStep();}else{checkResultsButton.disabled=false;}}
+     // --- Analysis Functions ---
+     function showAnalysisSection() { if(analysisSection) analysisSection.classList.remove('hidden'); if (resultsTableBody) populateAnalysisTable(); else console.error("resultsTableBody not found!"); }
+     function populateAnalysisTable() { if (!resultsTableBody) { console.error("Cannot populate table, resultsTableBody null."); return; } resultsTableBody.innerHTML = ''; const rows=['E','F','G','H']; rows.forEach((rowLabel,index)=>{const tr=document.createElement('tr'); const pNum=index+1; let pName=`Patient ${pNum}`; if(pNum===1)pName+=" (Joe)"; const tdP=document.createElement('td'); tdP.textContent=pName; tr.appendChild(tdP); for(let i=0;i<9;i++){const cN=i+1; const sId=`${rowLabel}${cN}`; const tdI=document.createElement('td'); const inp=document.createElement('input'); inp.type="text"; inp.id=`input-${sId}`; inp.dataset.row=rowLabel; inp.dataset.col=cN; inp.maxLength="1"; tdI.appendChild(inp); tr.appendChild(tdI);} resultsTableBody.appendChild(tr); }); }
+     function eraseAnalysisTable() { if (!resultsTableBody) return; const inputs = resultsTableBody.querySelectorAll('input[type="text"]'); inputs.forEach(input => { input.value = ''; input.style.backgroundColor = ''; }); if(resultsFeedback) resultsFeedback.textContent = ''; if(checkResultsButton) checkResultsButton.disabled = false; console.log("Analysis table erased."); }
+     function checkAnalysisResults() { if (!resultsTableBody || !resultsFeedback) return; let correctCount=0; let applicableSpots=0; resultsFeedback.textContent=''; for(const spotId in spotsState){const state=spotsState[spotId]; const inputEl=document.getElementById(`input-${spotId}`); if(inputEl){const userVal=inputEl.value.trim().toLowerCase(); let expectedSym='',isCorrect=false; if(state.sample_applied){applicableSpots++; switch(state.final_color){case 'red':expectedSym='↑';break; case 'green':expectedSym='↓';break; case 'yellow':expectedSym='n';break; case 'black':expectedSym='-';break;} if(state.final_color==='red'&&(userVal==='↑'||userVal==='u'))isCorrect=true; else if(state.final_color==='green'&&(userVal==='↓'||userVal==='d'))isCorrect=true; else if(state.final_color==='yellow'&&(userVal==='n'||userVal==='='))isCorrect=true; else if(state.final_color==='black'&&(userVal==='-'||userVal==='b'||userVal===''))isCorrect=true; if(isCorrect){correctCount++; inputEl.style.backgroundColor='lightgreen';}else{inputEl.style.backgroundColor='lightcoral';}}else{if(userVal===''||userVal==='-'){inputEl.style.backgroundColor='lightgrey';}else{inputEl.style.backgroundColor='lightcoral';}}}} resultsFeedback.textContent=`You got ${correctCount} out of ${applicableSpots} applicable results correct. ${correctCount===applicableSpots?'Excellent!':'Review colors.'}`; if(correctCount===applicableSpots&&applicableSpots>0){updateChecklist('analyze'); currentStep='done'; updateUIForStep();}else{if(checkResultsButton) checkResultsButton.disabled=false;}}
 
-    // --- Utility Functions ---
+     // --- Utility Functions ---
+     function updateInstruction(text) { if(instructionText) instructionText.textContent = text; }
+     function updateChecklist(stepKey) { if(checklistItems[stepKey]) checklistItems[stepKey].classList.add('completed'); }
 
-    function updateInstruction(text) { /* ... */ instructionText.textContent = text; }
-    function updateChecklist(stepKey) { /* ... */ if(checklistItems[stepKey]) checklistItems[stepKey].classList.add('completed'); }
-
-    // *** NEW updatePipetteVisual using SVG ***
-    function updatePipetteVisual() {
+     // *** NEW updatePipetteVisual using SVG - LONGER & NARROWER Tip ***
+     function updatePipetteVisual() {
+        if (!pipetteTipMount) {
+            console.error("pipetteTipMount element not found for visual update.");
+            return;
+        }
         // Clear existing tip/liquid visuals
         if (pipetteState.liquidSvgElement) {
              if (pipetteTipMount.contains(pipetteState.liquidSvgElement)) {
@@ -409,9 +486,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add new tip if needed
         if (pipetteState.hasTip && !pipetteState.tipSvgElement) {
             const tip = document.createElementNS(svgNS, "polygon");
-            // Simple cone shape: points="x1,y1 x2,y2 x3,y3"
-            tip.setAttribute("points", "-4,0 4,0 0,15"); // Adjust size/shape as needed
-            tip.setAttribute("fill", "#FFFFFF"); // Default tip color
+            // *** LONGER & NARROWER CONE ***
+            // Start wider at top, end very narrow (e.g., width 1) at a much larger Y value
+            tip.setAttribute("points", "-4,0 4,0 0.5,45 -0.5,45"); // Long cone ending almost at a point
+            tip.setAttribute("fill", "#FFFFFF");
             tip.setAttribute("stroke", "#555");
             tip.setAttribute("stroke-width", "0.5");
             pipetteTipMount.appendChild(tip);
@@ -421,63 +499,68 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add liquid if tip exists and reagent loaded
         if (pipetteState.tipSvgElement && pipetteState.loaded) {
             const liquid = document.createElementNS(svgNS, "polygon");
-             // Smaller polygon inside the tip, adjust y-offset and height
-            liquid.setAttribute("points", "-3,5 3,5 0,14"); // Smaller shape within tip
-            liquid.setAttribute("fill", liquidColors[pipetteState.loaded] || '#808080'); // Use color map or default grey
+             // *** Adjust liquid to match LONGER & NARROWER tip ***
+            // Start slightly narrower than tip top, end very narrow near tip bottom
+            // Adjust y-coordinates proportionally
+            liquid.setAttribute("points", "-3,5 3,5 0.4,43 -0.4,43"); // Liquid within the new tip shape
+            liquid.setAttribute("fill", liquidColors[pipetteState.loaded] || '#808080');
             liquid.setAttribute("stroke", "none");
-            // Append liquid *after* tip so it appears on top
-            pipetteTipMount.appendChild(liquid);
+            pipetteTipMount.appendChild(liquid); // Append after tip
             pipetteState.liquidSvgElement = liquid; // Store reference
         }
     }
     // *** END NEW updatePipetteVisual ***
 
+     function disableAllControls() {
+         // Disable regular buttons
+         const buttons = [startButton, skipButton, checkResultsButton, eraseTableButton];
+         buttons.forEach(button => { if (button) button.disabled = true; });
 
-    function disableAllControls() {
-        startButton.disabled = true; // Disable start button
-        if(skipButton) skipButton.disabled = true; // Disable skip button
+         // Disable SVGs by adding class
+         const svgs = [tipBoxSvg, wasteBinSvg, incubatorSvg, uvLightSvg, ebTube, cdnaTube, hbTube];
+         svgs.forEach(svg => { if (svg) svg.classList.add('disabled'); });
 
-        const svgs = [tipBoxSvg, wasteBinSvg, incubatorSvg, uvLightSvg, ebTube, cdnaTube, hbTube];
-        svgs.forEach(svg => { if (svg) svg.classList.add('disabled') });
+         // Disable interactive areas
+         setSpotsClickable(false);
+         setWellsClickable(false);
+     }
 
-        const buttons = [checkResultsButton, eraseTableButton]; // Analysis buttons
-        buttons.forEach(button => { if (button) button.disabled = true });
+     function enableControls(buttonIds) { // Primarily for non-SVG buttons
+         buttonIds.forEach(id => {
+             const button = document.getElementById(id);
+             if (button) button.disabled = false;
+         });
+     }
 
-        setSpotsClickable(false);
-        setWellsClickable(false);
-    }
+     function enableSvgControls(svgIds) { // Specifically for SVGs
+         svgIds.forEach(id => {
+             const svg = document.getElementById(id);
+             if (svg) {
+                 svg.classList.remove('disabled');
+             } else {
+                 console.error(`SVG element not found for enabling: ${id}`);
+             }
+         });
+     }
 
-    function enableControls(buttonIds) { // Primarily for non-SVG buttons
-        buttonIds.forEach(id => {
-            const button = document.getElementById(id);
-            if (button) button.disabled = false;
-        });
-    }
+     function setSpotsClickable(isClickable, stepContext = null, specificSpotId = null) {
+         if (!microarrayCardDiv) return;
+         const spots = microarrayCardDiv.querySelectorAll('.spot');
+         spots.forEach(spot => { const spotId = spot.id.split('-')[1]; const state = spotsState[spotId]; let makeClickable = false; if (isClickable && state) { let needsProcessing=false; if (stepContext === 'eb' && !state.eb_applied) needsProcessing=true; else if (stepContext === 'spot-sample' && !state.sample_applied && spotId === specificSpotId) needsProcessing=true; else if (stepContext === 'hb' && state.sample_applied && !state.hb_applied) needsProcessing=true; if (needsProcessing) makeClickable = true; } if (makeClickable) spot.classList.add('clickable'); else spot.classList.remove('clickable'); });
+     }
 
-    function enableSvgControls(svgIds) { // Specifically for SVGs
-        svgIds.forEach(id => {
-            const svg = document.getElementById(id);
-            if (svg) {
-                svg.classList.remove('disabled');
-            }
-        });
-    }
+     function setWellsClickable(isClickable, stepContext = null, specificWellId = null) {
+         if (!quickstripPlateDiv) return;
+         const wells = quickstripPlateDiv.querySelectorAll('.well');
+         wells.forEach(well => { const wellId = well.id.split('-')[1]; let makeClickable = false; if (isClickable && specificWellId && wellId === specificWellId && (stepContext === 'dispense-cdna' || stepContext === 'mix-well')) makeClickable = true; if (makeClickable) well.classList.add('clickable'); else well.classList.remove('clickable'); });
+     }
 
-    function setSpotsClickable(isClickable, stepContext = null, specificSpotId = null) { /* ... remains the same ... */
-        const spots = microarrayCardDiv.querySelectorAll('.spot');
-        spots.forEach(spot => { const spotId = spot.id.split('-')[1]; const state = spotsState[spotId]; let makeClickable = false; if (isClickable && state) { let needsProcessing=false; if (stepContext === 'eb' && !state.eb_applied) needsProcessing=true; else if (stepContext === 'spot-sample' && !state.sample_applied && spotId === specificSpotId) needsProcessing=true; else if (stepContext === 'hb' && state.sample_applied && !state.hb_applied) needsProcessing=true; if (needsProcessing) makeClickable = true; } if (makeClickable) spot.classList.add('clickable'); else spot.classList.remove('clickable'); });
-    }
+     function getWellIdFromCounter(counter) {
+         const rowLabels = ['E','F','G','H']; if (counter >= totalSamples) counter=totalSamples-1; const row = rowLabels[Math.floor(counter / 9)]; const col = (counter % 9) + 1; return `${row}${col}`;
+     }
+     function getSpotIdFromCounter(counter) { return getWellIdFromCounter(counter); }
 
-    function setWellsClickable(isClickable, stepContext = null, specificWellId = null) { /* ... remains the same ... */
-        const wells = quickstripPlateDiv.querySelectorAll('.well');
-        wells.forEach(well => { const wellId = well.id.split('-')[1]; let makeClickable = false; if (isClickable && specificWellId && wellId === specificWellId && (stepContext === 'dispense-cdna' || stepContext === 'mix-well')) makeClickable = true; if (makeClickable) well.classList.add('clickable'); else well.classList.remove('clickable'); });
-    }
-
-    function getWellIdFromCounter(counter) { /* ... remains the same ... */
-        const rowLabels = ['E','F','G','H']; if (counter >= totalSamples) counter=totalSamples-1; const row = rowLabels[Math.floor(counter / 9)]; const col = (counter % 9) + 1; return `${row}${col}`;
-    }
-    function getSpotIdFromCounter(counter) { /* ... */ return getWellIdFromCounter(counter); }
-
-    // --- Start ---
+    // --- Start Initialization ---
     init();
+
 }); // End DOMContentLoaded

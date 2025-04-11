@@ -38,16 +38,26 @@ h1, h2, h3, h4 {
 }
 
 #tools-reagents-column {
-    flex: 0 0 20%;
+    /* Reduce width slightly */
+    flex: 0 0 18%; /* Was 20% */
     display: flex;
     flex-direction: column;
     overflow-y: auto;
-    min-width: 220px;
+    min-width: 180px; /* Was 220px */
     gap: 15px;
 }
-#tools, #reagents {
+
+#reagents {
     background-color: #f9f9f9;
     padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+}
+
+/* Adjust padding inside tools section */
+#tools {
+    background-color: #f9f9f9;
+    padding: 5px; /* Reduced padding */
     border-radius: 5px;
     border: 1px solid #ddd;
 }
@@ -81,18 +91,20 @@ h1, h2, h3, h4 {
 
 /* --- SVG Icon Styles --- */
 .svg-tool-container { /* Container for pipette SVG */
-    text-align: center; /* Center pipette */
-    margin-bottom: 15px;
-    min-height: 130px; /* Ensure space for pipette */
+    text-align: center;
+    margin-bottom: 5px; /* Reduced margin */
+    min-height: 125px; /* Reduced height slightly */
+    padding: 5px 0; /* Add some padding */
 }
 
+/* Adjust grid gap for tool icons */
 .tool-grid { /* Container for the 4 tool icons */
     display: grid;
-    grid-template-columns: repeat(2, 1fr); /* 2x2 grid */
-    gap: 15px;
-    justify-items: center; /* Center SVGs horizontally in grid cells */
-    align-items: center; /* Center SVGs vertically */
-    padding: 10px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;  /* Reduced gap */
+    justify-items: center;
+    align-items: center;
+    padding: 5px; /* Reduced padding */
 }
 
 .reagent-grid {
@@ -102,12 +114,27 @@ h1, h2, h3, h4 {
     padding: 10px 0;
 }
 
-.tool-svg, .reagent-tube {
-    cursor: pointer;
-    transition: transform 0.2s ease-in-out, opacity 0.3s ease;
-    display: block; /* Ensure SVG takes block space */
-    margin: auto; /* Help centering in grid/flex */
+/* Reduce reagent tube size slightly too if desired */
+.reagent-tube {
+    width: 35px; /* Was 40 */
+    height: 70px; /* Was 80 */
+    /* Adjust other styles if needed */
+     cursor: pointer;
+     transition: transform 0.2s ease-in-out, opacity 0.3s ease;
+     display: block;
+     margin: auto;
 }
+
+/* Optional: Slightly reduce size of tool SVGs if needed */
+.tool-svg {
+    /* Example: width: 55px; */ /* Adjust width/height directly if needed */
+    /* The viewBox scaling should handle most of it */
+     cursor: pointer;
+     transition: transform 0.2s ease-in-out, opacity 0.3s ease;
+     display: block;
+     margin: auto;
+}
+
 
 .tool-svg:hover, .reagent-tube:hover {
     transform: scale(1.05);
